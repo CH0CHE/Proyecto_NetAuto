@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetAuto MTTR - Consola NOC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #0d1117; 
+            color: #c9d1d9; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            min-height: 100vh; 
+        }
+        .card { 
+            background-color: #161b22; 
+            border: 1px solid #30363d; 
+            border-radius: 12px; 
+        }
+        .hero-logo { 
+            font-size: 3.5rem; 
+            font-weight: 800; 
+            letter-spacing: -1px; 
+        }
+        .search-box { 
+            max-width: 650px; 
+            margin: 0 auto; 
+        }
+        .form-control-dark { 
+            background-color: #0d1117; 
+            border: 2px solid #30363d; 
+            color: #fff; 
+            font-size: 1.25rem; 
+        }
+        .form-control-dark:focus { 
+            background-color: #0d1117; 
+            border-color: #1f6feb; 
+            color: #fff; 
+            box-shadow: none; 
+        }
+        .stat-badge { 
+            padding: 8px 18px; 
+            border-radius: 20px; 
+            font-weight: 700; 
+            font-size: 1.05rem; 
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="container py-3">
+
+        <!-- VISTA 1: PANTALLA PRINCIPAL (LOGO + BUSCADOR POR ID) -->
+        <div id="vistaInicio" class="text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-router text-primary" style="font-size: 4.5rem;"></i>
+                <div class="hero-logo text-white">NetAuto<span class="text-primary">-MTTR</span></div>
+                <p class="text-secondary fs-5">Consola de Autodiagnóstico y Análisis de Causa Raíz en Redes de Última Milla</p>
+            </div>
+
+            <div class="search-box my-4">
+                <div class="input-group input-group-lg shadow-sm">
+                    <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-upc-scan"></i></span>
+                    <input type="text" id="inputCircuitId" class="form-control form-control-dark text-uppercase" placeholder="Ingrese ID de Enlace (ej. GT00001)" value="GT00001">
+                    <button class="btn btn-primary px-4 fw-bold" onclick="iniciarDiagnostico()" id="btnIniciar">
+                        <i class="bi bi-play-circle-fill"></i> Diagnosticar
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3 px-2">
+                    <small class="text-secondary"><i class="bi bi-info-circle"></i> Ingrese el ID del circuito asociado al ticket NOC</small>
+                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#modalNuevoDispositivo" onclick="obtenerSiguienteID()">
+                        <i class="bi bi-plus-circle"></i> Agregar Nuevo Enlace
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resumen de Métricas MTTR -->
+            <div class="row justify-content-center mt-5 g-3">
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <small class="text-secondary">MTTR Manual Base</small>
+                        <div class="fs-4 text-danger fw-bold">58.60 min</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <small class="text-secondary">MTTR NetAuto</small>
+                        <div class="fs-4 text-success fw-bold">13.43 min</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <small class="text-secondary">Eficiencia Operativa</small>
+                        <div class="fs-4 text-info fw-bold">-77.09%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 2: RESULTADOS DEL DIAGNÓSTICO (SE MUESTRA TRAS DIAGNOSTICAR) -->
+        <div id="vistaResultados" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                <div>
+                    <h3 class="text-white mb-0"><i class="bi bi-shield-check text-success"></i> Resultado de Diagnóstico: <span id="resCircuitId" class="text-primary">-</span></h3>
+                    <small class="text-secondary" id="resTimestamp">Fecha y hora: -</small>
+                </div>
+                <button class="btn btn-outline-light" onclick="volverAlInicio()">
+                    <i class="bi bi-arrow-left"></i> Nuevo Diagnóstico
+                </button>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <!-- Telemetría Física -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-dark text-white fw-bold"><i class="bi bi-cpu"></i> Telemetría del Enlace (Capa 1 - 3)</div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush bg-transparent">
+                                <li class="list-group-item bg-transparent text-secondary d-flex justify-content-between">
+                                    <span>Estado Interfaz:</span> <strong class="text-white" id="resState">-</strong>
+                                </li>
+                                <li class="list-group-item bg-transparent text-secondary d-flex justify-content-between">
+                                    <span>Pérdida ICMP:</span> <strong id="resLoss">-</strong>
+                                </li>
+                                <li class="list-group-item bg-transparent text-secondary d-flex justify-content-between">
+                                    <span>Potencia Óptica Rx:</span> <strong id="resRx">-</strong>
+                                </li>
+                                <li class="list-group-item bg-transparent text-secondary d-flex justify-content-between">
+                                    <span>Potencia Óptica Tx:</span> <strong class="text-white" id="resTx">-</strong>
+                                </li>
+                                <li class="list-group-item bg-transparent text-secondary d-flex justify-content-between">
+                                    <span>Vecino LLDP Detectado:</span> <strong class="text-info" id="resLldp">-</strong>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dictamen y Despacho -->
+                <div class="col-md-6">
+                    <div class="card h-100 text-center d-flex flex-column justify-content-center p-4">
+                        <span class="text-secondary mb-2">Dictamen Automatizado de Causa Raíz:</span>
+                        <h4 class="text-info fw-bold" id="resRca">-</h4>
+                        <div class="my-3">
+                            <span id="resDispatch" class="badge stat-badge bg-secondary">-</span>
+                        </div>
+                        <small class="text-secondary" id="resDuration">Tiempo de Diagnóstico: -</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL PARA AGREGAR NUEVO DISPOSITIVO -->
+    <div class="modal fade" id="modalNuevoDispositivo" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark text-white border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle text-info"></i> Registrar Nuevo Enlace / CPE</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary">ID Correlativo del Circuito:</label>
+                        <input type="text" id="newId" class="form-control bg-black text-info border-secondary fw-bold" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary">Ubicación / Sede Cliente:</label>
+                        <input type="text" id="newName" class="form-control bg-black text-white border-secondary" placeholder="Ej. BANCO-AGENCIA-ZONA10">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary">Dirección IP de Gestión:</label>
+                        <input type="text" id="newIp" class="form-control bg-black text-white border-secondary" placeholder="192.168.88.1" value="192.168.88.1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary">Interfaz Óptica (WAN / SFP):</label>
+                        <input type="text" id="newPort" class="form-control bg-black text-white border-secondary" value="sfp1">
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info fw-bold" onclick="guardarNuevoEnlace()">Guardar Enlace</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function obtenerSiguienteID() {
+            try {
+                const res = await fetch('/api/v1/devices/next-id');
+                const data = await res.json();
+                document.getElementById('newId').value = data.next_id;
+            } catch (err) {
+                console.error("Error al obtener ID:", err);
+            }
+        }
+
+        async function guardarNuevoEnlace() {
+            const id = document.getElementById('newId').value;
+            const name = document.getElementById('newName').value.trim() || 'Sede Central';
+            const ip = document.getElementById('newIp').value.trim() || '192.168.88.1';
+            const port = document.getElementById('newPort').value.trim() || 'sfp1';
+
+            try {
+                const res = await fetch('/api/v1/devices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        circuit_id: id,
+                        site_location: name,
+                        ip_address: ip,
+                        wan_interface: port
+                    })
+                });
+
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('modalNuevoDispositivo')).hide();
+                    document.getElementById('inputCircuitId').value = id;
+                    alert(`¡Enlace ${id} guardado correctamente! Ya puedes ejecutar su diagnóstico.`);
+                } else {
+                    alert("Error al registrar enlace en la base de datos.");
+                }
+            } catch (err) {
+                alert("Error de conexión al guardar: " + err);
+            }
+        }
+
+        async function iniciarDiagnostico() {
+            const circuitId = document.getElementById('inputCircuitId').value.trim() || 'GT00001';
+            const btn = document.getElementById('btnIniciar');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Diagnosticando...';
+
+            try {
+                const res = await fetch(`/api/v1/diagnostic/run-by-id/${circuitId}`, { method: 'POST' });
+                const json = await res.json();
+                const d = json.data;
+
+                // Cargar datos en la vista de resultados
+                document.getElementById('resCircuitId').textContent = circuitId;
+                document.getElementById('resTimestamp').textContent = "Ejecutado: " + new Date().toLocaleString();
+                document.getElementById('resState').textContent = d.state;
+                document.getElementById('resLoss').textContent = d.loss + "%";
+                document.getElementById('resLoss').className = d.loss > 0 ? "text-danger" : "text-success";
+                document.getElementById('resRx').textContent = d.rx + " dBm";
+                document.getElementById('resRx').className = d.rx < -24.0 ? "text-warning" : "text-success";
+                document.getElementById('resTx').textContent = d.tx + " dBm";
+                document.getElementById('resLldp').textContent = d.lldp;
+
+                document.getElementById('resRca').textContent = d.rca;
+                const badge = document.getElementById('resDispatch');
+                badge.textContent = d.dispatch;
+                badge.className = d.dispatch.includes("NO ENVIAR") ? "badge stat-badge bg-success" : "badge stat-badge bg-danger";
+                document.getElementById('resDuration').textContent = `Tiempo de diagnóstico: ${d.duration}s`;
+
+                // Transición: Ocultar inicio y mostrar resultados
+                document.getElementById('vistaInicio').style.display = 'none';
+                document.getElementById('vistaResultados').style.display = 'block';
+
+            } catch (err) {
+                alert("Error durante el diagnóstico: " + err);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Diagnosticar';
+            }
+        }
+
+        function volverAlInicio() {
+            document.getElementById('vistaResultados').style.display = 'none';
+            document.getElementById('vistaInicio').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
